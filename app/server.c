@@ -37,7 +37,7 @@ int main()
 	socklen_t client_addr_len;
 	struct sockaddr_in client_addr;
 	char buffer[1024] = {0};
-	//
+
 	server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_fd == -1)
 	{
@@ -87,9 +87,44 @@ int main()
 		return 1;
 	}
 
+	char *known_path[3] = {"/", "/echo", "/user-agent"};
 	char *path = extract_path(buffer);
 
-	if (!path || strcmp(path, "/") != 0)
+	if (strstr(path, known_path[1]) != NULL)
+	{
+		char *body = path + strlen(known_path[1]) + 1;
+		char response[1024];
+		snprintf(response, sizeof(response), "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %zu\r\n\r\n%s", strlen(body), body);
+		send(id, response, sizeof(response), 0);
+		send(id, path, strlen(path), 0);
+	}
+	else if (strstr(path, known_path[2]) != NULL)
+	{
+		char *headers = strstr(buffer, "\r\n") + 2;
+		char *headers_end = strstr(headers, "\r\n\r\n");
+
+		if (headers_end != NULL)
+		{
+			*headers_end = '\0'; // change from '/r/n/r/n' to '/0'(string end)
+		}
+		char *line = strtok(headers, "\r\n");
+		while (line != NULL)
+		{
+			if (strstr(line, "User-Agent: ") != NULL)
+			{
+				char response[2048];
+				char *agent = line + strlen("User-Agent: ");
+				// printf("User-Agent: %s\n", line + strlen("User-Agent: "));
+				snprintf(response, sizeof(response), "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %zu\r\n\r\n%s", strlen(agent), agent);
+				send(id, response, sizeof(response), 0);
+				break;
+			}
+			line = strtok(NULL, "\r\n");
+		}
+		char response[] = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n";
+		send(id, response, sizeof(response), 0);
+	}
+	else if (!path || strcmp(path, known_path[0]) != 0)
 	{
 		char response[] = "HTTP/1.1 404 Not Found\r\n\r\n";
 		send(id, response, sizeof(response), 0);

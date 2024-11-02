@@ -1,3 +1,5 @@
+# Build Your Own HTTP Server Challenge
+
 [![progress-banner](https://backend.codecrafters.io/progress/http-server/644d71b5-a2ab-4494-ab1c-e81c2ce0fec3)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
 
 This is a starting point for C solutions to the
@@ -14,7 +16,7 @@ and more.
 **Note**: If you're viewing this repo on GitHub, head over to
 [codecrafters.io](https://codecrafters.io) to try the challenge.
 
-# Passing the first stage
+## Passing the first stage
 
 The entry point for your HTTP server implementation is in `app/server.c`. Study
 and uncomment the relevant code, and push your changes to pass the first stage:
@@ -26,7 +28,7 @@ git push origin master
 
 Time to move on to the next stage!
 
-# Stage 2 & beyond
+## Stage 2 & beyond
 
 Note: This section is for stages 2 and beyond.
 
