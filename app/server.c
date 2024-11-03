@@ -35,7 +35,7 @@ void *handle_client(void *arg)
 		return NULL;
 	}
 
-	char *known_path[3] = {"/", "/echo", "/user-agent"};
+	char *known_path[4] = {"/", "/echo", "/user-agent", "files"};
 	char *path = extract_path(buffer);
 
 	if (strstr(path, known_path[1]) != NULL)
@@ -70,6 +70,27 @@ void *handle_client(void *arg)
 			line = strtok(NULL, "\r\n");
 		}
 		char response[] = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n";
+		send(id, response, sizeof(response), 0);
+	}
+	else if (strstr(path, known_path[3]) != NULL)
+	{
+		char *filename = path + strlen(known_path[3]) + 2;
+		char response[1024];
+		char full_path[1024];
+		snprintf(full_path, sizeof(full_path), "./tmp/%s", filename);
+		printf("full_path: %s\n", full_path);
+		FILE *file = fopen(full_path, "r");
+		if (!file)
+		{
+			char response[] = "HTTP/1.1 404 Not Found\r\n\r\n";
+			send(id, response, sizeof(response), 0);
+			close(id);
+			return NULL;
+		}
+		char content[1024] = {0};
+		fgets(content, sizeof(content), file);
+		fclose(file);
+		snprintf(response, sizeof(response), "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %zu\r\n\r\n%s", strlen(content), content);
 		send(id, response, sizeof(response), 0);
 	}
 	else if (!path || strcmp(path, known_path[0]) != 0)
