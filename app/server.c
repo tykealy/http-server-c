@@ -6,6 +6,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <pthread.h>
 
 char *extract_path(char *buffer)
 {
@@ -22,69 +23,16 @@ char *extract_path(char *buffer)
 	return path;
 };
 
-int main()
+void *handle_client(void *arg)
 {
-	// Disable output buffering
-	setbuf(stdout, NULL);
-	setbuf(stderr, NULL);
-
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	printf("Logs from your program will appear here!\n");
-
-	// Uncomment this block to pass the first stage
-	//
-	int server_fd;
-	socklen_t client_addr_len;
-	struct sockaddr_in client_addr;
+	int id = (intptr_t)arg;
 	char buffer[1024] = {0};
-
-	server_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (server_fd == -1)
-	{
-		printf("Socket creation failed: %s...\n", strerror(errno));
-		return 1;
-	}
-
-	// Since the tester restarts your program quite often, setting SO_REUSEADDR
-	// ensures that we don't run into 'Address already in use' errors
-	int reuse = 1;
-	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
-	{
-		printf("SO_REUSEADDR failed: %s \n", strerror(errno));
-		return 1;
-	}
-
-	struct sockaddr_in serv_addr = {
-		.sin_family = AF_INET,
-		.sin_port = htons(4221),
-		.sin_addr = {htonl(INADDR_ANY)},
-	};
-
-	if (bind(server_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) != 0)
-	{
-		printf("Bind failed: %s \n", strerror(errno));
-		return 1;
-	}
-
-	int connection_backlog = 5;
-	if (listen(server_fd, connection_backlog) != 0)
-	{
-		printf("Listen failed: %s \n", strerror(errno));
-		return 1;
-	}
-
-	printf("Waiting for a client to connect...\n");
-	client_addr_len = sizeof(client_addr);
-
-	int id = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
-	printf("Client connected\n");
-
 	int bytes_received = recv(id, buffer, sizeof(buffer) - 1, 0);
 
 	if (bytes_received < 0)
 	{
 		printf("Receive failed: %s \n", strerror(errno));
-		return 1;
+		return NULL;
 	}
 
 	char *known_path[3] = {"/", "/echo", "/user-agent"};
@@ -134,8 +82,87 @@ int main()
 		char response[] = "HTTP/1.1 200 OK\r\n\r\n";
 		send(id, response, sizeof(response), 0);
 	}
+	free(path);
+	close(id);
+	return NULL;
+}
+
+int main()
+{
+	// Disable output buffering
+	setbuf(stdout, NULL);
+	setbuf(stderr, NULL);
+
+	// You can use print statements as follows for debugging, they'll be visible when running tests.
+	printf("Logs from your program will appear here!\n");
+
+	// Uncomment this block to pass the first stage
+	//
+	int server_fd, id;
+	socklen_t client_addr_len;
+	struct sockaddr_in client_addr;
+	char buffer[1024] = {0};
+	pthread_t thread_id;
+
+	server_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (server_fd == -1)
+	{
+		printf("Socket creation failed: %s...\n", strerror(errno));
+		return 1;
+	}
+
+	// Since the tester restarts your program quite often, setting SO_REUSEADDR
+	// ensures that we don't run into 'Address already in use' errors
+	int reuse = 1;
+	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
+	{
+		printf("SO_REUSEADDR failed: %s \n", strerror(errno));
+		return 1;
+	}
+
+	struct sockaddr_in serv_addr = {
+		.sin_family = AF_INET,
+		.sin_port = htons(4221),
+		.sin_addr = {htonl(INADDR_ANY)},
+	};
+
+	if (bind(server_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) != 0)
+	{
+		printf("Bind failed: %s \n", strerror(errno));
+		return 1;
+	}
+
+	int connection_backlog = 5;
+	if (listen(server_fd, connection_backlog) != 0)
+	{
+		printf("Listen failed: %s \n", strerror(errno));
+		return 1;
+	}
+
+	printf("Waiting for a client to connect...\n");
+
+	while (1)
+	{
+		client_addr_len = sizeof(client_addr);
+		id = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+		if (id == -1)
+		{
+			printf("Accept failed: %s \n", strerror(errno));
+			continue;
+		}
+		printf("Client connected\n");
+
+		if (pthread_create(&thread_id, NULL, handle_client, (void *)(intptr_t)id) != 0)
+		{
+			printf("Thread creation failed: %s \n", strerror(errno));
+			close(id);
+		}
+		else
+		{
+			pthread_detach(thread_id);
+		}
+	}
 
 	close(server_fd);
-
 	return 0;
 }
